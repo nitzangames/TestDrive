@@ -4,7 +4,7 @@ import { biomeAt, BIOMES } from '../lib/game/biomes.js';
 import { buildScatterRegistry } from '../lib/scatter/index.js';
 import { buildRoadGraph } from '../lib/roads/graph.js';
 import { RoadManager } from '../lib/roads/manager.js';
-import { resolveCarRoadCollision, isCarOffGraph, isCarNearAnyJunction } from '../lib/roads/collision.js';
+import { resolveCarRoadCollision, isCarOffGraph, isCarNearAnyJunction, queryRoadAt } from '../lib/roads/collision.js';
 import { riverDepthAt } from '../lib/terrain/carve.js';
 import { buildCarModel } from '../lib/car/model.js';
 import { CarPhysics, CAR_CONSTANTS } from '../lib/car/physics.js';
@@ -182,6 +182,11 @@ function tick(now) {
       physics.step(input._steering ?? 0, FIXED_DT);
       const nearJunction = isCarNearAnyJunction(graph, physics);
       resolveCarRoadCollision(graph, physics, nearJunction);
+      // Ride on the road surface (smoothed polyline Y) instead of raw terrain.
+      // Otherwise the road sometimes bridges above terrain in dips and the car
+      // falls through.
+      const q = queryRoadAt(graph, physics.x, physics.z);
+      if (q) physics.y = q.roadY;
     }
     accumulator -= FIXED_DT;
   }
