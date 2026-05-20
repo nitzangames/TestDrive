@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="game-version" content="v0.1.1">
+  <title>TestDrive</title>
+  <link rel="icon" href="data:,">
+  <style>
+    html, body {
+      margin: 0; padding: 0; width: 100%; height: 100%;
+      overflow: hidden; background: #000;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #stage {
+      position: relative;
+      aspect-ratio: 9 / 16;
+      max-width: 100vw;
+      max-height: 100vh;
+      height: 100vh;
+      container-type: size;
+    }
+    canvas {
+      display: block; width: 100%; height: 100%;
+      touch-action: none;
+      -webkit-touch-callout: none; -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #hud-canvas {
+      position: absolute; inset: 0;
+      pointer-events: none;
+    }
+    #ui-root {
+      position: absolute; inset: 0; pointer-events: none; z-index: 50;
+      overflow: hidden;
+    }
+    #boot {
+      position: fixed; inset: 0; z-index: 100;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: #0a0e14; color: #cfd8e0; font-family: ui-monospace, Menlo, monospace;
+      transition: opacity .4s ease;
+    }
+    #boot.hidden { opacity: 0; pointer-events: none; }
+    .boot-title { font-size: 32px; font-weight: 700; letter-spacing: 0.18em; color: #fff; margin-bottom: 28px; }
+    .boot-spinner { width: 44px; height: 44px; border-radius: 50%; border: 3px solid #2a3142; border-top-color: #6db4ff; animation: boot-spin 0.8s linear infinite; margin-bottom: 18px; }
+    @keyframes boot-spin { to { transform: rotate(360deg); } }
+    .boot-phase { font-size: 13px; color: #8896aa; letter-spacing: 0.08em; }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn-play.nitzan.games/lib/play-sdk.js"></script>
+</head>
+<body>
+  <div id="stage">
+    <canvas id="game" width="1080" height="1920"></canvas>
+    <canvas id="hud-canvas" width="1080" height="1920"></canvas>
+    <div id="ui-root"></div>
+  </div>
+  <div id="boot">
+    <div class="boot-title">TESTDRIVE</div>
+    <div class="boot-spinner"></div>
+    <div class="boot-phase">Loading…</div>
+  </div>
+  <script type="module" src="shell/main.js"></script>
+</body>
+</html>
