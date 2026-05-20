@@ -13,6 +13,7 @@ import { ChaseCamera } from '../lib/car/camera.js';
 import { EngineAudio } from '../lib/audio/engine.js';
 import { HUD } from '../lib/ui/hud.js';
 import { MainMenu } from '../lib/ui/menu.js';
+import { CrashOverlay } from '../lib/ui/crash-overlay.js';
 import { StateMachine, MENU, DRIVE } from '../lib/game/state.js';
 
 console.log('[testdrive] ' + VERSION);
@@ -126,6 +127,7 @@ scene.fog = new THREE.Fog(
 const hud_ = new HUD(hud, graph);
 
 const uiRoot = document.getElementById('ui-root');
+const crashOverlay = new CrashOverlay(uiRoot);
 // Menu uses its own car instance so the world car doesn't visually teleport.
 const menuCar = buildCarModel(THREE);
 const menu = new MainMenu({ THREE, uiRoot, carModel: menuCar });
@@ -193,9 +195,11 @@ function tick(now) {
     if (isCarOffGraph(graph, physics)) {
       if (stuckSince < 0) stuckSince = now / 1000;
       else if ((now / 1000) - stuckSince > OFF_GRAPH_RESPAWN_AFTER) {
-        physics.x = graph.spawn.x; physics.z = graph.spawn.z;
-        physics.headingY = graph.spawn.headingY; physics.speed = 0;
-        stuckSince = -1;
+        crashOverlay.trigger(() => {
+          physics.x = graph.spawn.x; physics.z = graph.spawn.z;
+          physics.headingY = graph.spawn.headingY; physics.speed = 0;
+          stuckSince = -1;
+        });
       }
     } else stuckSince = -1;
   }
