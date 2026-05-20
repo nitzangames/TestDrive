@@ -3,8 +3,8 @@ import { createTerrain } from '../lib/terrain/index.js';
 import { biomeAt, BIOMES } from '../lib/game/biomes.js';
 import { buildScatterRegistry } from '../lib/scatter/index.js';
 import { buildRoadGraph } from '../lib/roads/graph.js';
-import { RoadManager } from '../lib/roads/manager.js';
-import { resolveCarRoadCollision, isCarOffGraph, isCarNearAnyJunction, queryRoadAt } from '../lib/roads/collision.js';
+import { queryRoadAt } from '../lib/roads/collision.js';
+import { carveChunkMesh } from '../lib/roads/carve.js';
 import { riverDepthAt } from '../lib/terrain/carve.js';
 import { buildCarModel } from '../lib/car/model.js';
 import { CarPhysics, CAR_CONSTANTS } from '../lib/car/physics.js';
@@ -13,7 +13,6 @@ import { ChaseCamera } from '../lib/car/camera.js';
 import { EngineAudio } from '../lib/audio/engine.js';
 import { HUD } from '../lib/ui/hud.js';
 import { MainMenu } from '../lib/ui/menu.js';
-import { CrashOverlay } from '../lib/ui/crash-overlay.js';
 import { StateMachine, MENU, DRIVE } from '../lib/game/state.js';
 
 console.log('[testdrive] ' + VERSION);
@@ -63,21 +62,29 @@ window.addEventListener('resize', resize);
 resize();
 
 const scatterGeometries = buildScatterRegistry(THREE);
+// `graph` is built after createTerrain (we need terrain.riverSegments), but
+// chunk loading is async — the worker won't deliver any chunks before the
+// graph exists. The carve callback closes over a let-binding and no-ops if
+// somehow called too early.
+let graph = null;
+const CHUNK_SIZE = 256;
 const terrain = createTerrain({
   THREE, scene, renderer,
   style: 'cartograph', perfMode: 'high', seed,
   biomeAt,
   scatterGeometries,
   enableVillages: false,
+  chunkPostprocessor: (mesh, cx, cz) => {
+    if (graph) carveChunkMesh(mesh, graph, cx, cz, CHUNK_SIZE);
+  },
 });
 
 setBootPhase('Generating roads…');
 await yieldPaint();
 const terrainHeightFn = (x, z) => terrain.getHeight(x, z);
 const isOnWater = (x, z) => riverDepthAt(x, z, terrain.riverSegments, 1) > 0;
-const graph = buildRoadGraph({ seed, terrainHeightFn, isOnWater });
+graph = buildRoadGraph({ seed, terrainHeightFn, isOnWater });
 console.log('[testdrive] road graph:', graph.nodes.length, 'nodes,', graph.edges.length, 'edges');
-const roadManager = new RoadManager(THREE, scene, graph, terrainHeightFn);
 
 // Lighting fallback: guardrails + car use Lambert materials and need a light source.
 if (!scene.children.some(c => c.isDirectionalLight)) {
@@ -104,7 +111,7 @@ window.__diag = {
   spawnNodeEdges: (graph.nodes.find(n => n.x === graph.spawn.x && n.z === graph.spawn.z) || {}).edges || [],
   getCar: () => ({ x: physics.x, y: physics.y, z: physics.z, headingY: physics.headingY, speed: physics.speed }),
   getCam: () => ({ x: camera.position.x, y: camera.position.y, z: camera.position.z }),
-  activeRoads: () => roadManager.activeEdges.size,
+  activeRoads: () => 0, // roads are baked into terrain chunks now
 };
 const input = new Input(canvas);
 
@@ -138,7 +145,6 @@ scene.fog = new THREE.Fog(
 const hud_ = new HUD(hud, graph);
 
 const uiRoot = document.getElementById('ui-root');
-const crashOverlay = new CrashOverlay(uiRoot);
 // Menu uses its own car instance so the world car doesn't visually teleport.
 const menuCar = buildCarModel(THREE);
 const menu = new MainMenu({ THREE, uiRoot, carModel: menuCar });
@@ -155,10 +161,6 @@ menu.onStart = () => {
 let last = performance.now();
 let accumulator = 0;
 const FIXED_DT = 1 / 120;
-let lastOffGraphCheck = 0;
-let stuckSince = -1;
-const OFF_GRAPH_CHECK_INTERVAL = 0.5;
-const OFF_GRAPH_RESPAWN_AFTER = 0.5;
 
 function tick(now) {
   let frameDt = (now - last) / 1000;
@@ -180,11 +182,10 @@ function tick(now) {
   while (accumulator >= FIXED_DT) {
     if (!runningPaused) {
       physics.step(input._steering ?? 0, FIXED_DT);
-      const nearJunction = isCarNearAnyJunction(graph, physics);
-      resolveCarRoadCollision(graph, physics, nearJunction);
-      // Ride on the road surface (smoothed polyline Y) instead of raw terrain.
-      // Otherwise the road sometimes bridges above terrain in dips and the car
-      // falls through.
+      // Roads are baked into the terrain mesh now (no separate road mesh, no
+      // guardrails). When the car is over a road corridor, snap Y to the road's
+      // carved height so the wheels sit on the asphalt; otherwise let the car
+      // ride on raw terrain (the player can drive freely off-road).
       const q = queryRoadAt(graph, physics.x, physics.z);
       if (q) physics.y = q.roadY;
     }
@@ -204,23 +205,6 @@ function tick(now) {
 
   chase.update(physics);
   terrain.update(camera.position, frameDt);
-  roadManager.update(camera.position);
-
-  // Off-graph recovery (unchanged from Task 17).
-  lastOffGraphCheck += frameDt;
-  if (lastOffGraphCheck >= OFF_GRAPH_CHECK_INTERVAL) {
-    lastOffGraphCheck = 0;
-    if (isCarOffGraph(graph, physics)) {
-      if (stuckSince < 0) stuckSince = now / 1000;
-      else if ((now / 1000) - stuckSince > OFF_GRAPH_RESPAWN_AFTER) {
-        crashOverlay.trigger(() => {
-          physics.x = graph.spawn.x; physics.z = graph.spawn.z;
-          physics.headingY = graph.spawn.headingY; physics.speed = 0;
-          stuckSince = -1;
-        });
-      }
-    } else stuckSince = -1;
-  }
 
   const b = biomeAt(physics.x, physics.z);
   hud_.setBiome(b.name);
