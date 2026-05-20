@@ -59,7 +59,12 @@ Files created or modified by this plan. Each row maps to one or more tasks.
 ## Conventions
 
 - **Tests first.** Every pure-logic module (graph, polyline, spatial index, collision, physics, input parsing, state machine) gets a failing test before implementation. Visual modules (geometry mesh, car model, menu, HUD) are verified by running the dev server and looking.
-- **Commit at the end of each task.** Bump `VERSION` in `lib/version.js` at every commit (e.g. `v0.1.0` → `v0.1.1`), per [[per-commit-version-bump]].
+- **Commit at the end of each task.** At each commit, bump THREE things in lockstep, per [[per-commit-version-bump]]:
+  1. `lib/version.js` VERSION constant (e.g. `v0.1.5` → `v0.1.6`)
+  2. `package.json` `"version"` field (e.g. `"0.1.5"` → `"0.1.6"`) — keep numeric, no leading `v`
+  3. `<meta name="game-version">` in `index.html` (matches lib/version.js exactly, with the `v` prefix)
+- **No amend.** Create new commits; never `--amend` (project rule). If a previous task missed a bump, fix it in a new "chore: sync ..." commit.
+- **No deploy.** Tasks must never run any deploy command. The deploy-gating rule requires explicit user authorization per action.
 - **Dev server.** `bash dev-server.sh` serves on `http://127.0.0.1:8086`. Open `http://127.0.0.1:8086` in a browser to verify each task's visual result.
 - **Sibling reference paths.** Several tasks reference files inside `/Users/nitzanwilnai/Programming/Claude/JSGames/FlightSim/` and `.../FormulaChampions3D/`. These are read-only sources; do not modify them.
 - **Three.js global.** This project uses `window.THREE` from a CDN script tag (matching FlightSim). All modules accept `THREE` as a function or constructor arg, not as a module import.
