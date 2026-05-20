@@ -98,8 +98,16 @@ if (!scene.children.some(c => c.isDirectionalLight)) {
 const car = buildCarModel(THREE);
 scene.add(car);
 
+// Per-wheel ground height: road surface when over a road corridor, raw terrain
+// otherwise. Each of the car's 4 wheels samples this independently so the body
+// tilts when one wheel is on tarmac and another is off the edge of the carve.
+const groundYFn = (x, z) => {
+  const q = queryRoadAt(graph, x, z);
+  return q ? q.roadY : terrainHeightFn(x, z);
+};
 const physics = new CarPhysics({
   terrainHeightFn,
+  groundYFn,
   spawn: graph.spawn,
 });
 
@@ -171,8 +179,11 @@ function tick(now) {
 
   if (fsm.state === MENU) {
     menu.update(frameDt);
+    // Pump the terrain chunk loader against the SPAWN position so the chunks
+    // around where the player will appear stream in (and get road-carved)
+    // while they watch the turntable, not after they hit Start.
+    terrain.update({ x: graph.spawn.x, y: graph.spawn.y, z: graph.spawn.z }, frameDt);
     renderer.render(menu.scene, menu.camera);
-    // Don't pump terrain/road streams while in menu — they'll start once we hit DRIVE.
     requestAnimationFrame(tick);
     return;
   }
@@ -181,13 +192,10 @@ function tick(now) {
   accumulator += frameDt;
   while (accumulator >= FIXED_DT) {
     if (!runningPaused) {
+      // CarPhysics handles per-wheel ground sampling via groundYFn — no
+      // post-step Y override needed here. The 4-wheel plane fit also drives
+      // pitch/roll, including the one-wheel-off-road tilt.
       physics.step(input._steering ?? 0, FIXED_DT);
-      // Roads are baked into the terrain mesh now (no separate road mesh, no
-      // guardrails). When the car is over a road corridor, snap Y to the road's
-      // carved height so the wheels sit on the asphalt; otherwise let the car
-      // ride on raw terrain (the player can drive freely off-road).
-      const q = queryRoadAt(graph, physics.x, physics.z);
-      if (q) physics.y = q.roadY;
     }
     accumulator -= FIXED_DT;
   }
