@@ -121,7 +121,7 @@ scene.fog = new THREE.Fog(
   forest.fogNear, forest.fogFar,
 );
 
-const hud_ = new HUD(hud);
+const hud_ = new HUD(hud, graph);
 
 let last = performance.now();
 let accumulator = 0;
@@ -181,6 +181,7 @@ function tick(now) {
 
   renderer.render(scene, camera);
   hud_.setSpeed(physics.speed);
+  hud_.setCar(physics);
   hud_.draw();
   requestAnimationFrame(tick);
 }
