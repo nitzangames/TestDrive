@@ -52,6 +52,7 @@ TestDrive/
 │   ├── version.js
 │   ├── terrain/             ← lifted from FlightSim, UNTOUCHED
 │   ├── scatter/             ← lifted from FlightSim, UNTOUCHED
+│   ├── poi/                 ← lifted from FlightSim, UNTOUCHED but inactive
 │   ├── game/
 │   │   ├── biomes.js        ← lifted from FlightSim, UNTOUCHED
 │   │   └── state.js         ← MENU / DRIVE
@@ -79,13 +80,17 @@ TestDrive/
 
 ### FlightSim integration
 
-- `lib/terrain/`, `lib/scatter/`, and `lib/game/biomes.js` are copied from
-  `JSGames/FlightSim/lib/...` at project setup. They are not modified.
+- `lib/terrain/`, `lib/scatter/`, `lib/poi/`, and `lib/game/biomes.js` are
+  copied from `JSGames/FlightSim/lib/...` at project setup. They are not
+  modified.
 - The single point of behavioral difference is the `createTerrain(...)` call
-  in `shell/main.js`, which passes `enableVillages: false` (an option that
-  already exists in FlightSim's `terrain/index.js`). POI/marker meshes never
-  enter the scene.
-- `lib/poi/`, `lib/plane/`, `lib/game/planes.js`, `lib/game/collision.js`,
+  in `shell/main.js`, which passes `enableVillages: false`. This bypasses
+  the village registry, so no POI meshes are ever placed in the world. POI
+  module code is loaded and POI geometry constructors are still called (to
+  populate the chunk-worker's geometry dictionary), but with no villages
+  registered nothing references that geometry — it sits unused. This keeps
+  the lifted terrain code modification-free.
+- `lib/plane/`, `lib/game/planes.js`, `lib/game/collision.js`,
   `lib/ui/*` from FlightSim are NOT copied — they are replaced by the
   car/road/UI modules above.
 
@@ -112,7 +117,9 @@ across the 64 km world (~3.2 km cell). For each candidate:
 
 - Sample terrain slope in a small neighborhood (4 height samples ±50 m around
   the candidate). Reject if average absolute slope > **18°**.
-- Reject if within **120 m** of any river segment centerline (no bridges in v1).
+- Reject if `riverDepthAt(x, z, riverSegments, 1) > 0` — the candidate sits on
+  a river. Bank avoidance is handled by the slope check. (Matches FlightSim's
+  own pattern for village rejection.)
 - Reject if within **600 m** (Poisson-disk style) of any previously-accepted
   node. Prevents node clumping.
 
@@ -125,7 +132,8 @@ Expected accepted nodes: ~150–250.
    - Is longer than **6000 m**, OR
    - Has any 50-m sub-segment whose slope exceeds **12°**, OR
    - Has total height delta > **200 m**, OR
-   - Crosses water at any sample point.
+   - Crosses water at any 50-m sample point — checked via
+     `riverDepthAt(x, z, riverSegments, 1) > 0`.
 3. Compute MST over surviving edges → guarantees a single connected component.
 4. Add the shortest surviving non-MST edges until total edge count is
    **1.25 × MST edge count**. Gives loops and choices at junctions.
