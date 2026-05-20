@@ -4,6 +4,7 @@ import { biomeAt, BIOMES } from '../lib/game/biomes.js';
 import { buildScatterRegistry } from '../lib/scatter/index.js';
 import { buildRoadGraph } from '../lib/roads/graph.js';
 import { RoadManager } from '../lib/roads/manager.js';
+import { resolveCarRoadCollision, isCarOffGraph, isCarNearAnyJunction } from '../lib/roads/collision.js';
 import { riverDepthAt } from '../lib/terrain/carve.js';
 import { buildCarModel } from '../lib/car/model.js';
 import { CarPhysics } from '../lib/car/physics.js';
@@ -114,6 +115,10 @@ function drawHUD() {
 let last = performance.now();
 let accumulator = 0;
 const FIXED_DT = 1 / 120;
+let lastOffGraphCheck = 0;
+let stuckSince = -1;
+const OFF_GRAPH_CHECK_INTERVAL = 0.5;
+const OFF_GRAPH_RESPAWN_AFTER = 0.5;
 
 function tick(now) {
   let frameDt = (now - last) / 1000;
@@ -124,7 +129,26 @@ function tick(now) {
   accumulator += frameDt;
   while (accumulator >= FIXED_DT) {
     physics.step(input._steering ?? 0, FIXED_DT);
+    const nearJunction = isCarNearAnyJunction(graph, physics);
+    resolveCarRoadCollision(graph, physics, nearJunction);
     accumulator -= FIXED_DT;
+  }
+
+  lastOffGraphCheck += frameDt;
+  if (lastOffGraphCheck >= OFF_GRAPH_CHECK_INTERVAL) {
+    lastOffGraphCheck = 0;
+    if (isCarOffGraph(graph, physics)) {
+      if (stuckSince < 0) stuckSince = now / 1000;
+      else if ((now / 1000) - stuckSince > OFF_GRAPH_RESPAWN_AFTER) {
+        physics.x = graph.spawn.x;
+        physics.z = graph.spawn.z;
+        physics.headingY = graph.spawn.headingY;
+        physics.speed = 0;
+        stuckSince = -1;
+      }
+    } else {
+      stuckSince = -1;
+    }
   }
 
   // Place car model.
