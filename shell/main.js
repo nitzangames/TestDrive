@@ -5,6 +5,10 @@ import { buildScatterRegistry } from '../lib/scatter/index.js';
 import { buildRoadGraph } from '../lib/roads/graph.js';
 import { RoadManager } from '../lib/roads/manager.js';
 import { riverDepthAt } from '../lib/terrain/carve.js';
+import { buildCarModel } from '../lib/car/model.js';
+import { CarPhysics } from '../lib/car/physics.js';
+import { Input } from '../lib/car/input.js';
+import { ChaseCamera } from '../lib/car/camera.js';
 
 console.log('[testdrive] ' + VERSION);
 
@@ -69,11 +73,25 @@ const graph = buildRoadGraph({ seed, terrainHeightFn, isOnWater });
 console.log('[testdrive] road graph:', graph.nodes.length, 'nodes,', graph.edges.length, 'edges');
 const roadManager = new RoadManager(THREE, scene, graph, terrainHeightFn);
 
-// Camera: hover above the spawn point, pan slowly along spawn-edge direction.
-camera.position.set(graph.spawn.x, graph.spawn.y + 80, graph.spawn.z);
-camera.lookAt(graph.spawn.x + Math.sin(graph.spawn.headingY) * 200,
-              graph.spawn.y,
-              graph.spawn.z + Math.cos(graph.spawn.headingY) * 200);
+// Lighting fallback: guardrails + car use Lambert materials and need a light source.
+if (!scene.children.some(c => c.isDirectionalLight)) {
+  const sun = new THREE.DirectionalLight(0xffffff, 1.0);
+  sun.position.set(120, 200, 80);
+  scene.add(sun);
+  scene.add(new THREE.HemisphereLight(0xcfd8e0, 0x202428, 0.5));
+}
+
+// Car + physics + input + chase camera.
+const car = buildCarModel(THREE);
+scene.add(car);
+
+const physics = new CarPhysics({
+  terrainHeightFn,
+  spawn: graph.spawn,
+});
+const input = new Input(canvas);
+const chase = new ChaseCamera(THREE, camera);
+chase.update(physics);  // seed initial camera pose
 
 // Atmosphere from forest biome.
 const forest = BIOMES.find(b => b.name === 'forest');
@@ -94,22 +112,33 @@ function drawHUD() {
 }
 
 let last = performance.now();
+let accumulator = 0;
+const FIXED_DT = 1 / 120;
+
 function tick(now) {
-  const dt = Math.min(0.05, (now - last) / 1000);
+  let frameDt = (now - last) / 1000;
+  if (frameDt > 0.1) frameDt = 0.1;
   last = now;
 
-  // Slow forward pan along spawn heading.
-  const v = 30; // m/s
-  camera.position.x += Math.sin(graph.spawn.headingY) * v * dt;
-  camera.position.z += Math.cos(graph.spawn.headingY) * v * dt;
-  camera.position.y = terrain.getHeight(camera.position.x, camera.position.z) + 30;
-  camera.lookAt(
-    camera.position.x + Math.sin(graph.spawn.headingY) * 100,
-    camera.position.y - 5,
-    camera.position.z + Math.cos(graph.spawn.headingY) * 100
-  );
+  input.update();
+  accumulator += frameDt;
+  while (accumulator >= FIXED_DT) {
+    physics.step(input._steering ?? 0, FIXED_DT);
+    accumulator -= FIXED_DT;
+  }
 
-  terrain.update(camera.position, dt);
+  // Place car model.
+  car.position.set(physics.x, physics.y - 0.0, physics.z);
+  car.rotation.y = physics.headingY;
+  car.rotation.x = physics.pitch;
+  car.rotation.z = -physics.roll;
+  // Spin wheels by speed (visual only).
+  const wheelSpin = (physics.speed * frameDt) / 0.36;
+  for (const w of car.userData.wheels) w.rotation.x += wheelSpin;
+
+  // Streaming + terrain pump uses the camera's position.
+  chase.update(physics);
+  terrain.update(camera.position, frameDt);
   roadManager.update(camera.position);
 
   renderer.render(scene, camera);
