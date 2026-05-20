@@ -11,6 +11,7 @@ import { CarPhysics, CAR_CONSTANTS } from '../lib/car/physics.js';
 import { Input } from '../lib/car/input.js';
 import { ChaseCamera } from '../lib/car/camera.js';
 import { EngineAudio } from '../lib/audio/engine.js';
+import { HUD } from '../lib/ui/hud.js';
 
 console.log('[testdrive] ' + VERSION);
 
@@ -120,15 +121,7 @@ scene.fog = new THREE.Fog(
   forest.fogNear, forest.fogFar,
 );
 
-const hctx = hud.getContext('2d');
-function drawHUD() {
-  hctx.clearRect(0, 0, hud.width, hud.height);
-  hctx.fillStyle = 'rgba(255,255,255,0.5)';
-  hctx.font = '21px ui-monospace, Menlo, monospace';
-  hctx.textAlign = 'left';
-  hctx.textBaseline = 'bottom';
-  hctx.fillText(VERSION, 24, hud.height - 24);
-}
+const hud_ = new HUD(hud);
 
 let last = performance.now();
 let accumulator = 0;
@@ -187,7 +180,8 @@ function tick(now) {
   roadManager.update(camera.position);
 
   renderer.render(scene, camera);
-  drawHUD();
+  hud_.setSpeed(physics.speed);
+  hud_.draw();
   requestAnimationFrame(tick);
 }
 
