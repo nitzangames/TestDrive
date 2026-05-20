@@ -194,7 +194,9 @@ function tick(now) {
   if (engineAudio) engineAudio.update(physics.speed);
 
   car.position.set(physics.x, physics.y, physics.z);
-  car.rotation.y = physics.headingY;
+  // Car model's default front is at -Z (headlights at z=-1.95) but the
+  // velocity at headingY=0 is +Z. Add PI to point the nose along motion.
+  car.rotation.y = physics.headingY + Math.PI;
   car.rotation.x = physics.pitch;
   car.rotation.z = -physics.roll;
   const wheelSpin = (physics.speed * frameDt) / 0.36;
