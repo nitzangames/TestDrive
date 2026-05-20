@@ -2,6 +2,9 @@ import { VERSION } from '../lib/version.js';
 import { createTerrain } from '../lib/terrain/index.js';
 import { biomeAt, BIOMES } from '../lib/game/biomes.js';
 import { buildScatterRegistry } from '../lib/scatter/index.js';
+import { buildRoadGraph } from '../lib/roads/graph.js';
+import { RoadManager } from '../lib/roads/manager.js';
+import { riverDepthAt } from '../lib/terrain/carve.js';
 
 console.log('[testdrive] ' + VERSION);
 
@@ -58,9 +61,19 @@ const terrain = createTerrain({
   enableVillages: false,
 });
 
-// Hover camera above terrain origin for visual verification.
-const groundY = terrain.getHeight(0, 0);
-camera.position.set(0, groundY + 150, 0);
+setBootPhase('Generating roads…');
+await yieldPaint();
+const terrainHeightFn = (x, z) => terrain.getHeight(x, z);
+const isOnWater = (x, z) => riverDepthAt(x, z, terrain.riverSegments, 1) > 0;
+const graph = buildRoadGraph({ seed, terrainHeightFn, isOnWater });
+console.log('[testdrive] road graph:', graph.nodes.length, 'nodes,', graph.edges.length, 'edges');
+const roadManager = new RoadManager(THREE, scene, graph, terrainHeightFn);
+
+// Camera: hover above the spawn point, pan slowly along spawn-edge direction.
+camera.position.set(graph.spawn.x, graph.spawn.y + 80, graph.spawn.z);
+camera.lookAt(graph.spawn.x + Math.sin(graph.spawn.headingY) * 200,
+              graph.spawn.y,
+              graph.spawn.z + Math.cos(graph.spawn.headingY) * 200);
 
 // Atmosphere from forest biome.
 const forest = BIOMES.find(b => b.name === 'forest');
@@ -81,21 +94,23 @@ function drawHUD() {
 }
 
 let last = performance.now();
-let orbit = 0;
 function tick(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
 
-  // Slow orbit around origin so we see the terrain & light interact.
-  orbit += dt * 0.05;
-  const r = 400;
-  camera.position.x = Math.cos(orbit) * r;
-  camera.position.z = Math.sin(orbit) * r;
-  camera.position.y = terrain.getHeight(camera.position.x, camera.position.z) + 250;
-  camera.lookAt(0, terrain.getHeight(0, 0), 0);
+  // Slow forward pan along spawn heading.
+  const v = 30; // m/s
+  camera.position.x += Math.sin(graph.spawn.headingY) * v * dt;
+  camera.position.z += Math.cos(graph.spawn.headingY) * v * dt;
+  camera.position.y = terrain.getHeight(camera.position.x, camera.position.z) + 30;
+  camera.lookAt(
+    camera.position.x + Math.sin(graph.spawn.headingY) * 100,
+    camera.position.y - 5,
+    camera.position.z + Math.cos(graph.spawn.headingY) * 100
+  );
 
-  // Drive the terrain chunk loader.
   terrain.update(camera.position, dt);
+  roadManager.update(camera.position);
 
   renderer.render(scene, camera);
   drawHUD();
