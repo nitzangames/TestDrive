@@ -182,7 +182,9 @@ function tick(now) {
   renderer.render(scene, camera);
   hud_.setSpeed(physics.speed);
   hud_.setCar(physics);
-  hud_.draw();
+  const b = biomeAt(physics.x, physics.z);
+  hud_.setBiome(b.name);
+  hud_.draw(frameDt);
   requestAnimationFrame(tick);
 }
 
