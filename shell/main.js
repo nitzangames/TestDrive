@@ -95,6 +95,17 @@ const physics = new CarPhysics({
   terrainHeightFn,
   spawn: graph.spawn,
 });
+
+// Diagnostics hook (read by tools/screenshot.js).
+window.__diag = {
+  spawn: graph.spawn,
+  nodeCount: graph.nodes.length,
+  edgeCount: graph.edges.length,
+  spawnNodeEdges: (graph.nodes.find(n => n.x === graph.spawn.x && n.z === graph.spawn.z) || {}).edges || [],
+  getCar: () => ({ x: physics.x, y: physics.y, z: physics.z, headingY: physics.headingY, speed: physics.speed }),
+  getCam: () => ({ x: camera.position.x, y: camera.position.y, z: camera.position.z }),
+  activeRoads: () => roadManager.activeEdges.size,
+};
 const input = new Input(canvas);
 
 let engineAudio = null;
