@@ -7,9 +7,10 @@ import { RoadManager } from '../lib/roads/manager.js';
 import { resolveCarRoadCollision, isCarOffGraph, isCarNearAnyJunction } from '../lib/roads/collision.js';
 import { riverDepthAt } from '../lib/terrain/carve.js';
 import { buildCarModel } from '../lib/car/model.js';
-import { CarPhysics } from '../lib/car/physics.js';
+import { CarPhysics, CAR_CONSTANTS } from '../lib/car/physics.js';
 import { Input } from '../lib/car/input.js';
 import { ChaseCamera } from '../lib/car/camera.js';
+import { EngineAudio } from '../lib/audio/engine.js';
 
 console.log('[testdrive] ' + VERSION);
 
@@ -91,6 +92,23 @@ const physics = new CarPhysics({
   spawn: graph.spawn,
 });
 const input = new Input(canvas);
+
+let engineAudio = null;
+let runningPaused = false;
+const startAudio = () => {
+  if (engineAudio) return;
+  engineAudio = new EngineAudio(CAR_CONSTANTS.MAX_SPEED);
+  canvas.removeEventListener('pointerdown', startAudio);
+  window.removeEventListener('keydown', startAudio);
+};
+canvas.addEventListener('pointerdown', startAudio, { once: false });
+window.addEventListener('keydown', startAudio, { once: false });
+
+document.addEventListener('visibilitychange', () => {
+  runningPaused = document.hidden;
+  if (engineAudio) document.hidden ? engineAudio.suspend() : engineAudio.resume();
+});
+
 const chase = new ChaseCamera(THREE, camera);
 chase.update(physics);  // seed initial camera pose
 
@@ -128,11 +146,14 @@ function tick(now) {
   input.update();
   accumulator += frameDt;
   while (accumulator >= FIXED_DT) {
-    physics.step(input._steering ?? 0, FIXED_DT);
-    const nearJunction = isCarNearAnyJunction(graph, physics);
-    resolveCarRoadCollision(graph, physics, nearJunction);
+    if (!runningPaused) {
+      physics.step(input._steering ?? 0, FIXED_DT);
+      const nearJunction = isCarNearAnyJunction(graph, physics);
+      resolveCarRoadCollision(graph, physics, nearJunction);
+    }
     accumulator -= FIXED_DT;
   }
+  if (engineAudio) engineAudio.update(physics.speed);
 
   lastOffGraphCheck += frameDt;
   if (lastOffGraphCheck >= OFF_GRAPH_CHECK_INTERVAL) {
