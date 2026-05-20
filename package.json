@@ -1,0 +1,14 @@
+{
+  "name": "test-drive",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dev": "bash dev-server.sh"
+  },
+  "devDependencies": {
+    "vitest": "^1.6.0"
+  }
+}
