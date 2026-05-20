@@ -12,6 +12,8 @@ import { Input } from '../lib/car/input.js';
 import { ChaseCamera } from '../lib/car/camera.js';
 import { EngineAudio } from '../lib/audio/engine.js';
 import { HUD } from '../lib/ui/hud.js';
+import { MainMenu } from '../lib/ui/menu.js';
+import { StateMachine, MENU, DRIVE } from '../lib/game/state.js';
 
 console.log('[testdrive] ' + VERSION);
 
@@ -123,6 +125,20 @@ scene.fog = new THREE.Fog(
 
 const hud_ = new HUD(hud, graph);
 
+const uiRoot = document.getElementById('ui-root');
+// Menu uses its own car instance so the world car doesn't visually teleport.
+const menuCar = buildCarModel(THREE);
+const menu = new MainMenu({ THREE, uiRoot, carModel: menuCar });
+menu.show();
+
+const fsm = new StateMachine();
+menu.onStart = () => {
+  fsm.start();
+  menu.hide();
+  // Resume audio context if it was created already.
+  if (engineAudio) engineAudio.resume();
+};
+
 let last = performance.now();
 let accumulator = 0;
 const FIXED_DT = 1 / 120;
@@ -137,6 +153,16 @@ function tick(now) {
   last = now;
 
   input.update();
+
+  if (fsm.state === MENU) {
+    menu.update(frameDt);
+    renderer.render(menu.scene, menu.camera);
+    // Don't pump terrain/road streams while in menu — they'll start once we hit DRIVE.
+    requestAnimationFrame(tick);
+    return;
+  }
+
+  // DRIVE state.
   accumulator += frameDt;
   while (accumulator >= FIXED_DT) {
     if (!runningPaused) {
@@ -146,45 +172,41 @@ function tick(now) {
     }
     accumulator -= FIXED_DT;
   }
+
   if (engineAudio) engineAudio.update(physics.speed);
 
+  car.position.set(physics.x, physics.y, physics.z);
+  car.rotation.y = physics.headingY;
+  car.rotation.x = physics.pitch;
+  car.rotation.z = -physics.roll;
+  const wheelSpin = (physics.speed * frameDt) / 0.36;
+  for (const w of car.userData.wheels) w.rotation.x += wheelSpin;
+
+  chase.update(physics);
+  terrain.update(camera.position, frameDt);
+  roadManager.update(camera.position);
+
+  // Off-graph recovery (unchanged from Task 17).
   lastOffGraphCheck += frameDt;
   if (lastOffGraphCheck >= OFF_GRAPH_CHECK_INTERVAL) {
     lastOffGraphCheck = 0;
     if (isCarOffGraph(graph, physics)) {
       if (stuckSince < 0) stuckSince = now / 1000;
       else if ((now / 1000) - stuckSince > OFF_GRAPH_RESPAWN_AFTER) {
-        physics.x = graph.spawn.x;
-        physics.z = graph.spawn.z;
-        physics.headingY = graph.spawn.headingY;
-        physics.speed = 0;
+        physics.x = graph.spawn.x; physics.z = graph.spawn.z;
+        physics.headingY = graph.spawn.headingY; physics.speed = 0;
         stuckSince = -1;
       }
-    } else {
-      stuckSince = -1;
-    }
+    } else stuckSince = -1;
   }
 
-  // Place car model.
-  car.position.set(physics.x, physics.y - 0.0, physics.z);
-  car.rotation.y = physics.headingY;
-  car.rotation.x = physics.pitch;
-  car.rotation.z = -physics.roll;
-  // Spin wheels by speed (visual only).
-  const wheelSpin = (physics.speed * frameDt) / 0.36;
-  for (const w of car.userData.wheels) w.rotation.x += wheelSpin;
-
-  // Streaming + terrain pump uses the camera's position.
-  chase.update(physics);
-  terrain.update(camera.position, frameDt);
-  roadManager.update(camera.position);
-
-  renderer.render(scene, camera);
-  hud_.setSpeed(physics.speed);
-  hud_.setCar(physics);
   const b = biomeAt(physics.x, physics.z);
   hud_.setBiome(b.name);
+  hud_.setCar(physics);
+  hud_.setSpeed(physics.speed);
   hud_.draw(frameDt);
+
+  renderer.render(scene, camera);
   requestAnimationFrame(tick);
 }
 
