@@ -33,7 +33,8 @@ describe('queryRoadAt', () => {
 describe('resolveCarRoadCollision', () => {
   it('clamps a car beyond the road edge back to the wall', () => {
     const g = makeGraph();
-    const car = { x: 100, y: 0, z: 8, headingY: 0, speed: 30 };
+    const outside = ROAD_HALF_WIDTH + 5;
+    const car = { x: 100, y: 0, z: outside, headingY: 0, speed: 30 };
     const result = resolveCarRoadCollision(g, car, /*nearJunction*/ false);
     expect(result.collided).toBe(true);
     const limit = ROAD_HALF_WIDTH - CAR_CONSTANTS.CAR_HALF_WIDTH;
@@ -43,16 +44,18 @@ describe('resolveCarRoadCollision', () => {
 
   it('does nothing when car is inside the corridor', () => {
     const g = makeGraph();
-    const car = { x: 100, y: 0, z: 2, headingY: 0, speed: 30 };
+    const inside = ROAD_HALF_WIDTH / 4;
+    const car = { x: 100, y: 0, z: inside, headingY: 0, speed: 30 };
     const result = resolveCarRoadCollision(g, car, false);
     expect(result.collided).toBe(false);
-    expect(car.z).toBe(2);
+    expect(car.z).toBe(inside);
     expect(car.speed).toBe(30);
   });
 
   it('skips clamp when near junction', () => {
     const g = makeGraph();
-    const car = { x: 100, y: 0, z: 8, headingY: 0, speed: 30 };
+    const outside = ROAD_HALF_WIDTH + 5;
+    const car = { x: 100, y: 0, z: outside, headingY: 0, speed: 30 };
     const result = resolveCarRoadCollision(g, car, /*nearJunction*/ true);
     expect(result.collided).toBe(false);
   });
