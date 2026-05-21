@@ -63,9 +63,14 @@ window.addEventListener('resize', resize);
 resize();
 
 const scatterGeometries = buildScatterRegistry(THREE);
+
+// Persisted style choice from the menu dropdown.
+const LS_STYLE = 'testdrive.style';
+const initialStyle = localStorage.getItem(LS_STYLE) || 'cartograph';
+
 const terrain = createTerrain({
   THREE, scene, renderer,
-  style: 'cartograph', perfMode: 'high', seed,
+  style: initialStyle, perfMode: 'high', seed,
   biomeAt,
   scatterGeometries,
   enableVillages: false,
@@ -189,8 +194,12 @@ const hud_ = new HUD(hud, graph);
 const uiRoot = document.getElementById('ui-root');
 // Menu uses its own car instance so the world car doesn't visually teleport.
 const menuCar = buildCarModel(THREE);
-const menu = new MainMenu({ THREE, uiRoot, carModel: menuCar });
+const menu = new MainMenu({ THREE, uiRoot, carModel: menuCar, initialStyle });
 menu.show();
+menu.onStyleChange = (styleName) => {
+  terrain.setStyle(styleName);
+  localStorage.setItem(LS_STYLE, styleName);
+};
 
 const fsm = new StateMachine();
 menu.onStart = () => {
