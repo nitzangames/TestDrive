@@ -4,7 +4,8 @@ import { biomeAt, BIOMES } from '../lib/game/biomes.js';
 import { buildScatterRegistry } from '../lib/scatter/index.js';
 import { buildLoopRoad } from '../lib/roads/loop.js';
 import { queryRoadAt } from '../lib/roads/collision.js';
-import { carveChunkMesh, roadInfluence, filterChunkScatter } from '../lib/roads/carve.js';
+import { roadInfluence } from '../lib/roads/carve.js';
+import { serializeRoadGraph } from '../lib/roads/shared.js';
 import { riverDepthAt } from '../lib/terrain/carve.js';
 import { buildCarModel } from '../lib/car/model.js';
 import { CarPhysics, CAR_CONSTANTS } from '../lib/car/physics.js';
@@ -62,33 +63,29 @@ window.addEventListener('resize', resize);
 resize();
 
 const scatterGeometries = buildScatterRegistry(THREE);
-// `graph` is built after createTerrain (we need terrain.riverSegments), but
-// chunk loading is async — the worker won't deliver any chunks before the
-// graph exists. The carve callback closes over a let-binding and no-ops if
-// somehow called too early.
-let graph = null;
-const CHUNK_SIZE = 256;
 const terrain = createTerrain({
   THREE, scene, renderer,
   style: 'cartograph', perfMode: 'high', seed,
   biomeAt,
   scatterGeometries,
   enableVillages: false,
-  chunkPostprocessor: (mesh, cx, cz, lod, out) => {
-    if (!graph) return;
-    carveChunkMesh(mesh, graph, cx, cz, CHUNK_SIZE);
-    // Also strip scatter (trees / cacti) inside the road's Y-influence band
-    // so nothing floats above or sinks into the carved terrain.
-    if (out && out.trees) filterChunkScatter(graph, out.trees);
-  },
 });
 
 setBootPhase('Generating roads…');
 await yieldPaint();
 const terrainHeightFn = (x, z) => terrain.getHeight(x, z);
 const isOnWater = (x, z) => riverDepthAt(x, z, terrain.riverSegments, 1) > 0;
-graph = buildLoopRoad({ seed, terrainHeightFn, isOnWater });
+const graph = buildLoopRoad({ seed, terrainHeightFn, isOnWater });
 console.log('[testdrive] road loop:', graph.nodes.length, 'nodes,', graph.edges.length, 'sub-edges');
+
+// Hand the road graph to the terrain's chunk worker BEFORE any chunks load.
+// The worker uses it inside buildChunkBuffers to carve heights, assign
+// biome-band colours from the carved (post-cut) elevation, and skip / lift
+// trees in the road corridor — all in one pass at generation time, so no
+// post-process hack is needed.
+setBootPhase('Linking roads to terrain…');
+await yieldPaint();
+await terrain.setRoadGraph(serializeRoadGraph(graph));
 
 // Lighting fallback: guardrails + car use Lambert materials and need a light source.
 if (!scene.children.some(c => c.isDirectionalLight)) {
