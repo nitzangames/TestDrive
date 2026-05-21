@@ -96,6 +96,14 @@ if (!scene.children.some(c => c.isDirectionalLight)) {
 
 // Car + physics + input + chase camera.
 const car = buildCarModel(THREE);
+// Default Euler order is 'XYZ' which applies X (pitch) and Z (roll) BEFORE
+// Y (yaw). With our yaw = heading + PI flip, pitch ends up acting around
+// the model's local +X axis after a 180° yaw, which points to world -X —
+// so positive rotation.x rotates the nose the wrong way and positive
+// rotation.z rolls the wrong way. 'YXZ' applies yaw first (orienting the
+// local frame to face motion), then pitch and roll act on the
+// already-oriented frame, which is the natural vehicle convention.
+car.rotation.order = 'YXZ';
 scene.add(car);
 
 // Per-wheel ground height. Uses the same smoothstep blend the carve applies
