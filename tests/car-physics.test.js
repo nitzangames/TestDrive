@@ -35,13 +35,12 @@ describe('CarPhysics', () => {
     expect(Math.abs(p.y - p.x * 0.01)).toBeLessThan(0.05);
   });
 
-  it('tilts pitch when the slope rises ahead of the car', () => {
+  it('tilts pitch nose-up when the slope rises ahead of the car', () => {
     // Slope rises 0.1 m per metre in +z (car forward at headingY=0 is +z).
     const slope = (x, z) => z * 0.1;
     const p = new CarPhysics({ terrainHeightFn: slope });
     for (let i = 0; i < 120; i++) p.step(0, 1 / 120);
-    // Front wheels are at higher z, so they're HIGHER than rear.
-    // targetPitch = atan2(rear - front, wheelbase) — rear is LOWER, so pitch is negative.
-    expect(p.pitch).toBeLessThan(-0.05);
+    // Front wheels are at higher z, so yFront > yRear. Positive pitch = nose up.
+    expect(p.pitch).toBeGreaterThan(0.05);
   });
 });
