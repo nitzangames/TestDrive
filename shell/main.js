@@ -2,7 +2,7 @@ import { VERSION } from '../lib/version.js';
 import { createTerrain } from '../lib/terrain/index.js';
 import { biomeAt, BIOMES } from '../lib/game/biomes.js';
 import { buildScatterRegistry } from '../lib/scatter/index.js';
-import { buildRoadGraph } from '../lib/roads/graph.js';
+import { buildLoopRoad } from '../lib/roads/loop.js';
 import { queryRoadAt } from '../lib/roads/collision.js';
 import { carveChunkMesh, roadInfluence } from '../lib/roads/carve.js';
 import { riverDepthAt } from '../lib/terrain/carve.js';
@@ -83,8 +83,8 @@ setBootPhase('Generating roads…');
 await yieldPaint();
 const terrainHeightFn = (x, z) => terrain.getHeight(x, z);
 const isOnWater = (x, z) => riverDepthAt(x, z, terrain.riverSegments, 1) > 0;
-graph = buildRoadGraph({ seed, terrainHeightFn, isOnWater });
-console.log('[testdrive] road graph:', graph.nodes.length, 'nodes,', graph.edges.length, 'edges');
+graph = buildLoopRoad({ seed, terrainHeightFn, isOnWater });
+console.log('[testdrive] road loop:', graph.nodes.length, 'nodes,', graph.edges.length, 'sub-edges');
 
 // Lighting fallback: guardrails + car use Lambert materials and need a light source.
 if (!scene.children.some(c => c.isDirectionalLight)) {
