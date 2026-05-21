@@ -129,6 +129,21 @@ const physics = new CarPhysics({
   spawn: graph.spawn,
 });
 
+// Visible state — lerped each frame toward physics so the car flows smoothly
+// through curves and chunk transitions. Initialised to the physics spawn so
+// the first frame doesn't tween in from (0,0,0).
+const visual = {
+  x: physics.x, y: physics.y, z: physics.z,
+  headingY: physics.headingY,
+  pitch: 0, roll: 0, speed: 0,
+};
+function wrapLerp(a, b, t) {
+  let d = b - a;
+  while (d > Math.PI) d -= 2 * Math.PI;
+  while (d < -Math.PI) d += 2 * Math.PI;
+  return a + d * t;
+}
+
 // Diagnostics hook (read by tools/screenshot.js).
 window.__diag = {
   spawn: graph.spawn,
@@ -220,16 +235,28 @@ function tick(now) {
 
   if (engineAudio) engineAudio.update(physics.speed);
 
-  car.position.set(physics.x, physics.y, physics.z);
+  // Lerp the visible car state toward the physics state so motion is smooth
+  // through tight curves and over chunk transitions. Adds a small (~30 ms)
+  // visual latency, but the chase camera reads the SAME visual state so the
+  // framing stays coherent.
+  visual.x += (physics.x - visual.x) * 0.5;
+  visual.z += (physics.z - visual.z) * 0.5;
+  visual.y += (physics.y - visual.y) * 0.5;
+  visual.headingY = wrapLerp(visual.headingY, physics.headingY, 0.35);
+  visual.pitch = physics.pitch;     // already lerped inside physics
+  visual.roll = physics.roll;
+  visual.speed = physics.speed;
+
+  car.position.set(visual.x, visual.y, visual.z);
   // Car model's default front is at -Z (headlights at z=-1.95) but the
   // velocity at headingY=0 is +Z. Add PI to point the nose along motion.
-  car.rotation.y = physics.headingY + Math.PI;
-  car.rotation.x = physics.pitch;
-  car.rotation.z = -physics.roll;
-  const wheelSpin = (physics.speed * frameDt) / 0.36;
+  car.rotation.y = visual.headingY + Math.PI;
+  car.rotation.x = visual.pitch;
+  car.rotation.z = -visual.roll;
+  const wheelSpin = (visual.speed * frameDt) / 0.36;
   for (const w of car.userData.wheels) w.rotation.x += wheelSpin;
 
-  chase.update(physics);
+  chase.update(visual);
   terrain.update(camera.position, frameDt);
 
   const b = biomeAt(physics.x, physics.z);
