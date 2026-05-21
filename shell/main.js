@@ -4,7 +4,7 @@ import { biomeAt, BIOMES } from '../lib/game/biomes.js';
 import { buildScatterRegistry } from '../lib/scatter/index.js';
 import { buildRoadGraph } from '../lib/roads/graph.js';
 import { queryRoadAt } from '../lib/roads/collision.js';
-import { carveChunkMesh } from '../lib/roads/carve.js';
+import { carveChunkMesh, roadInfluence } from '../lib/roads/carve.js';
 import { riverDepthAt } from '../lib/terrain/carve.js';
 import { buildCarModel } from '../lib/car/model.js';
 import { CarPhysics, CAR_CONSTANTS } from '../lib/car/physics.js';
@@ -98,12 +98,22 @@ if (!scene.children.some(c => c.isDirectionalLight)) {
 const car = buildCarModel(THREE);
 scene.add(car);
 
-// Per-wheel ground height: road surface when over a road corridor, raw terrain
-// otherwise. Each of the car's 4 wheels samples this independently so the body
-// tilts when one wheel is on tarmac and another is off the edge of the carve.
+// Per-wheel ground height. Uses the same smoothstep blend the carve applies
+// to chunk vertices, so the wheel pose exactly matches the visible terrain:
+//   * inside the corridor → roadY
+//   * in the transition band → blend(roadY, terrainY) via roadInfluence()
+//   * outside the band → raw terrain
+// Without this match, wheels in the 15–21 m transition band would see roadY
+// from queryRoadAt while the visible terrain is the blended value, and the
+// car would visibly hover/tilt.
 const groundYFn = (x, z) => {
   const q = queryRoadAt(graph, x, z);
-  return q ? q.roadY : terrainHeightFn(x, z);
+  const terrain = terrainHeightFn(x, z);
+  if (!q) return terrain;
+  const w = roadInfluence(q.lateralOffset);
+  if (w <= 0) return terrain;
+  if (w >= 1) return q.roadY;
+  return q.roadY * w + terrain * (1 - w);
 };
 const physics = new CarPhysics({
   terrainHeightFn,
