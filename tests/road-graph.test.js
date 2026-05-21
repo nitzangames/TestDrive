@@ -28,8 +28,11 @@ describe('generateNodeCandidates', () => {
 });
 
 function terrainHeightFn2(x, z) {
-  // Gentle rolling terrain, no peaks.
-  return Math.sin(x / 800) * 20 + Math.cos(z / 700) * 15;
+  // Gentle rolling terrain, no peaks. Offset by 60 m so every sample stays
+  // well above the water plane (y=0); the road generator now rejects
+  // candidates and A* cells at/below water level, which would otherwise
+  // disconnect this fixture.
+  return Math.sin(x / 800) * 20 + Math.cos(z / 700) * 15 + 60;
 }
 const noWater2 = (x, z) => false;
 
