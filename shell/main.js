@@ -4,7 +4,7 @@ import { biomeAt, BIOMES } from '../lib/game/biomes.js';
 import { buildScatterRegistry } from '../lib/scatter/index.js';
 import { buildLoopRoad } from '../lib/roads/loop.js';
 import { queryRoadAt } from '../lib/roads/collision.js';
-import { carveChunkMesh, roadInfluence } from '../lib/roads/carve.js';
+import { carveChunkMesh, roadInfluence, filterChunkScatter } from '../lib/roads/carve.js';
 import { riverDepthAt } from '../lib/terrain/carve.js';
 import { buildCarModel } from '../lib/car/model.js';
 import { CarPhysics, CAR_CONSTANTS } from '../lib/car/physics.js';
@@ -74,8 +74,12 @@ const terrain = createTerrain({
   biomeAt,
   scatterGeometries,
   enableVillages: false,
-  chunkPostprocessor: (mesh, cx, cz) => {
-    if (graph) carveChunkMesh(mesh, graph, cx, cz, CHUNK_SIZE);
+  chunkPostprocessor: (mesh, cx, cz, lod, out) => {
+    if (!graph) return;
+    carveChunkMesh(mesh, graph, cx, cz, CHUNK_SIZE);
+    // Also strip scatter (trees / cacti) inside the road's Y-influence band
+    // so nothing floats above or sinks into the carved terrain.
+    if (out && out.trees) filterChunkScatter(graph, out.trees);
   },
 });
 
