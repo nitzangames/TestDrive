@@ -6,6 +6,7 @@ import { buildLoopRoad } from '../lib/roads/loop.js';
 import { queryRoadAt } from '../lib/roads/collision.js';
 import { roadInfluence } from '../lib/roads/carve.js';
 import { serializeRoadGraph } from '../lib/roads/shared.js';
+import { buildRoadEdgeLines } from '../lib/roads/lines.js';
 import { riverDepthAt } from '../lib/terrain/carve.js';
 import { buildCarModel } from '../lib/car/model.js';
 import { CarPhysics, CAR_CONSTANTS } from '../lib/car/physics.js';
@@ -91,6 +92,10 @@ console.log('[testdrive] road loop:', graph.nodes.length, 'nodes,', graph.edges.
 setBootPhase('Linking roads to terrain…');
 await yieldPaint();
 await terrain.setRoadGraph(serializeRoadGraph(graph));
+
+// Yellow edge-line ribbons. Two thin meshes (one per side) added once to
+// the scene; they don't change at runtime so this is fire-and-forget.
+scene.add(buildRoadEdgeLines(THREE, graph));
 
 // Lighting fallback: guardrails + car use Lambert materials and need a light source.
 if (!scene.children.some(c => c.isDirectionalLight)) {
