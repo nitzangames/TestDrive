@@ -257,16 +257,19 @@ function tick(now) {
 
   if (engineAudio) engineAudio.update(physics.speed);
 
-  // Lerp the visible car state toward the physics state so motion is smooth
-  // through tight curves and over chunk transitions. Adds a small (~30 ms)
-  // visual latency, but the chase camera reads the SAME visual state so the
-  // framing stays coherent.
-  visual.x += (physics.x - visual.x) * 0.5;
-  visual.z += (physics.z - visual.z) * 0.5;
-  visual.y += (physics.y - visual.y) * 0.5;
-  visual.headingY = wrapLerp(visual.headingY, physics.headingY, 0.35);
-  visual.pitch = physics.pitch;     // already lerped inside physics
-  visual.roll = physics.roll;
+  // Lerp the visible car state toward the physics state. Heavier smoothing
+  // here (smaller factors → longer time constant) gives the car and the
+  // chase camera a smoother visual feel through curves and chunk loads at
+  // the cost of a ~80 ms latency between physics and visible. The chase
+  // camera reads the same visual state so framing stays coherent.
+  visual.x += (physics.x - visual.x) * 0.30;
+  visual.z += (physics.z - visual.z) * 0.30;
+  visual.y += (physics.y - visual.y) * 0.30;
+  visual.headingY = wrapLerp(visual.headingY, physics.headingY, 0.22);
+  // Pitch / roll are already lerped inside physics; further lerping here
+  // would over-damp them.
+  visual.pitch += (physics.pitch - visual.pitch) * 0.40;
+  visual.roll  += (physics.roll  - visual.roll)  * 0.40;
   visual.speed = physics.speed;
 
   car.position.set(visual.x, visual.y, visual.z);
