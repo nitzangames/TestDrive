@@ -103,10 +103,11 @@ scene.add(buildRoadEdgeLines(THREE, graph));
 scene.add(buildRoadCenterLine(THREE, graph));
 scene.add(buildGuardrails(THREE, graph));
 
-// Ambient AI traffic — 80 NPC cars cruise the loop in the right lane at
-// varied speeds (6-50 m/s). Updated and collision-checked against the
-// player every DRIVE-state tick below.
-const traffic = new AITraffic({ THREE, scene, graph, count: 80 });
+// Ambient AI traffic — pool of NPC cars that spawn around the player.
+// ~55% drive the same direction as the player, ~45% are oncoming. As
+// cars drift out of range they recycle back into the pool. Updated +
+// collision-checked against the player every DRIVE-state tick below.
+const traffic = new AITraffic({ THREE, scene, graph });
 
 // Lighting fallback: guardrails + car use Lambert materials and need a light source.
 if (!scene.children.some(c => c.isDirectionalLight)) {
@@ -291,7 +292,7 @@ function tick(now) {
 
   chase.update(visual);
   terrain.update(camera.position, frameDt);
-  traffic.update(frameDt);
+  traffic.update(frameDt, physics);
   traffic.resolveCollisions(physics);
 
   const b = biomeAt(physics.x, physics.z);
