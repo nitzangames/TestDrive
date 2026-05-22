@@ -7,6 +7,8 @@ import { queryRoadAt } from '../lib/roads/collision.js';
 import { roadInfluence } from '../lib/roads/carve.js';
 import { serializeRoadGraph } from '../lib/roads/shared.js';
 import { buildRoadEdgeLines } from '../lib/roads/lines.js';
+import { buildRoadCenterLine } from '../lib/roads/center-line.js';
+import { AITraffic } from '../lib/traffic/ai-traffic.js';
 import { riverDepthAt } from '../lib/terrain/carve.js';
 import { buildCarModel } from '../lib/car/model.js';
 import { CarPhysics, CAR_CONSTANTS } from '../lib/car/physics.js';
@@ -93,9 +95,14 @@ setBootPhase('Linking roads to terrain…');
 await yieldPaint();
 await terrain.setRoadGraph(serializeRoadGraph(graph));
 
-// Yellow edge-line ribbons. Two thin meshes (one per side) added once to
-// the scene; they don't change at runtime so this is fire-and-forget.
+// Yellow edge-line ribbons + dashed white centre line. Both are static
+// strip meshes built from the polyline; no per-frame work.
 scene.add(buildRoadEdgeLines(THREE, graph));
+scene.add(buildRoadCenterLine(THREE, graph));
+
+// Ambient AI traffic — 6 NPC cars cruise the loop in the right lane at
+// varied speeds. Updated each tick in the DRIVE state below.
+const traffic = new AITraffic({ THREE, scene, graph, count: 30 });
 
 // Lighting fallback: guardrails + car use Lambert materials and need a light source.
 if (!scene.children.some(c => c.isDirectionalLight)) {
@@ -273,6 +280,7 @@ function tick(now) {
 
   chase.update(visual);
   terrain.update(camera.position, frameDt);
+  traffic.update(frameDt);
 
   const b = biomeAt(physics.x, physics.z);
   hud_.setBiome(b.name);
