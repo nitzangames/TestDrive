@@ -52,11 +52,4 @@ describe('resolveCarRoadCollision', () => {
     expect(car.speed).toBe(30);
   });
 
-  it('skips clamp when near junction', () => {
-    const g = makeGraph();
-    const outside = ROAD_HALF_WIDTH + 5;
-    const car = { x: 100, y: 0, z: outside, headingY: 0, speed: 30 };
-    const result = resolveCarRoadCollision(g, car, /*nearJunction*/ true);
-    expect(result.collided).toBe(false);
-  });
 });

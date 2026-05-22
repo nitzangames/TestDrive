@@ -3,7 +3,7 @@ import { createTerrain } from '../lib/terrain/index.js';
 import { biomeAt, BIOMES } from '../lib/game/biomes.js';
 import { buildScatterRegistry } from '../lib/scatter/index.js';
 import { buildLoopRoad } from '../lib/roads/loop.js';
-import { queryRoadAt } from '../lib/roads/collision.js';
+import { queryRoadAt, resolveCarRoadCollision } from '../lib/roads/collision.js';
 import { roadInfluence } from '../lib/roads/carve.js';
 import { serializeRoadGraph } from '../lib/roads/shared.js';
 import { buildRoadEdgeLines } from '../lib/roads/lines.js';
@@ -255,6 +255,10 @@ function tick(now) {
       // post-step Y override needed here. The 4-wheel plane fit also drives
       // pitch/roll, including the one-wheel-off-road tilt.
       physics.step(input._steering ?? 0, FIXED_DT);
+      // Resolve guardrail collision INSIDE the substep so a fast car can't
+      // tunnel through the rail in one frame. Slides the car along the
+      // rail and scrubs some speed (see lib/roads/collision.js).
+      resolveCarRoadCollision(graph, physics);
     }
     accumulator -= FIXED_DT;
   }
