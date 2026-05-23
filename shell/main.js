@@ -220,6 +220,8 @@ menu.onStyleChange = (styleName) => {
 
 const fsm = new StateMachine();
 let gameOver = false;
+let lastLoggedBiome = null;
+let lastBiomeLogAt = 0;
 menu.onStart = () => {
   fsm.start();
   menu.hide();
@@ -248,9 +250,37 @@ gameOverEl.innerHTML = `
 `;
 uiRoot.appendChild(gameOverEl);
 gameOverEl.querySelector('#go-restart').addEventListener('click', () => {
-  // Full reload — simplest reset path. World seed in localStorage so the
-  // same map regenerates if the user wants the same layout.
-  location.reload();
+  // Reset in place — keep the world, snap the car back to the road at
+  // the crash position, clear speed, re-arm traffic. The player resumes
+  // wherever they crashed instead of being teleported to the start.
+  const q = queryRoadAt(graph, physics.x, physics.z);
+  if (q) {
+    // Snap to the right lane at the same arc-length position. Right lane =
+    // driver's right of polyline forward direction = perpendicular (-tz, tx)
+    // multiplied by RIGHT_LANE_OFFSET (matches ai-traffic.js / loop.js).
+    const e = graph.edges[q.edgeId];
+    const a = e.polyline[q.segIndex], b = e.polyline[q.segIndex + 1];
+    const sx = a.x + (b.x - a.x) * q.forwardT;
+    const sz = a.z + (b.z - a.z) * q.forwardT;
+    const tx = q.segTangentX, tz = q.segTangentZ;
+    // Pick the polyline direction closer to the car's previous heading so
+    // the player faces "forward along the road" in whichever sense they
+    // were already going.
+    const vx = Math.sin(physics.headingY), vz = Math.cos(physics.headingY);
+    const sign = (vx * tx + vz * tz) >= 0 ? +1 : -1;
+    const LANE = 3.5;
+    physics.x = sx + (-tz * LANE) * sign;
+    physics.z = sz + ( tx * LANE) * sign;
+    physics.headingY = Math.atan2(sign * tx, sign * tz);
+  }
+  physics.speed = 0;
+  // Sync the visual immediately so the camera doesn't tween from the
+  // crash spot to the respawn spot.
+  visual.x = physics.x; visual.y = physics.y; visual.z = physics.z;
+  visual.headingY = physics.headingY;
+  gameOver = false;
+  gameOverEl.style.display = 'none';
+  traffic.reset();
 });
 
 traffic.onCrash = (impactSpeed) => {
@@ -336,6 +366,18 @@ function tick(now) {
 
   const b = biomeAt(physics.x, physics.z);
   hud_.setBiome(b.name);
+  // Log biome + altitude periodically so the user can verify what's
+  // being detected at their current position vs what they're seeing.
+  if (b.name !== lastLoggedBiome || performance.now() - lastBiomeLogAt > 5000) {
+    console.log(
+      '[biome]', b.name,
+      'pos', physics.x.toFixed(0) + ',' + physics.z.toFixed(0),
+      'alt', physics.y.toFixed(1) + 'm',
+      'scatter', b.scatterKey,
+    );
+    lastLoggedBiome = b.name;
+    lastBiomeLogAt = performance.now();
+  }
   hud_.setCar(physics);
   hud_.setSpeed(physics.speed);
   hud_.draw(frameDt);
