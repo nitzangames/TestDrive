@@ -219,11 +219,47 @@ menu.onStyleChange = (styleName) => {
 };
 
 const fsm = new StateMachine();
+let gameOver = false;
 menu.onStart = () => {
   fsm.start();
   menu.hide();
-  // Resume audio context if it was created already.
   if (engineAudio) engineAudio.resume();
+  // Empty road for 2 s after the player enters DRIVE so the first thing
+  // they see isn't a wall of cars.
+  traffic.arm(2.0);
+};
+
+// Game-over overlay — built once, kept hidden until the player crashes.
+const gameOverEl = document.createElement('div');
+gameOverEl.style.cssText = `
+  position:absolute;inset:0;display:none;flex-direction:column;
+  align-items:center;justify-content:center;text-align:center;
+  background:rgba(10,14,20,0.82);color:#fff;
+  font-family:ui-monospace,Menlo,monospace;pointer-events:auto;z-index:60;
+`;
+gameOverEl.innerHTML = `
+  <div style="font-size:144px;font-weight:700;letter-spacing:0.04em;margin-bottom:48px;">CRASH</div>
+  <div id="go-stats" style="font-size:48px;opacity:0.8;margin-bottom:80px;"></div>
+  <button id="go-restart" style="
+    width:60%;padding:36px 0;font:600 66px ui-monospace,Menlo,monospace;
+    color:#0a0e14;background:#f1c64a;border:none;border-radius:18px;
+    cursor:pointer;letter-spacing:0.04em;
+  ">RESTART</button>
+`;
+uiRoot.appendChild(gameOverEl);
+gameOverEl.querySelector('#go-restart').addEventListener('click', () => {
+  // Full reload — simplest reset path. World seed in localStorage so the
+  // same map regenerates if the user wants the same layout.
+  location.reload();
+});
+
+traffic.onCrash = (impactSpeed) => {
+  if (gameOver) return;
+  gameOver = true;
+  gameOverEl.style.display = 'flex';
+  gameOverEl.querySelector('#go-stats').textContent =
+    'Impact: ' + Math.round(impactSpeed * 3.6) + ' km/h';
+  if (engineAudio) engineAudio.update(0);
 };
 
 let last = performance.now();
@@ -251,7 +287,7 @@ function tick(now) {
   // DRIVE state.
   accumulator += frameDt;
   while (accumulator >= FIXED_DT) {
-    if (!runningPaused) {
+    if (!runningPaused && !gameOver) {
       // CarPhysics handles per-wheel ground sampling via groundYFn — no
       // post-step Y override needed here. The 4-wheel plane fit also drives
       // pitch/roll, including the one-wheel-off-road tilt.
@@ -292,8 +328,10 @@ function tick(now) {
 
   chase.update(visual);
   terrain.update(camera.position, frameDt);
-  traffic.update(frameDt, physics);
-  traffic.resolveCollisions(physics);
+  if (!gameOver) {
+    traffic.update(frameDt, physics);
+    traffic.resolveCollisions(physics);
+  }
 
   const b = biomeAt(physics.x, physics.z);
   hud_.setBiome(b.name);
