@@ -68,13 +68,14 @@ resize();
 
 const scatterGeometries = buildScatterRegistry(THREE);
 
-// Persisted style choice from the menu dropdown.
-const LS_STYLE = 'testdrive.style';
-const initialStyle = localStorage.getItem(LS_STYLE) || 'cartograph';
+// Persisted traffic-density choice from the menu dropdown.
+const LS_TRAFFIC = 'justdrive.traffic';
+const initialTraffic = localStorage.getItem(LS_TRAFFIC) || 'medium';
 
+// Style is fixed to 'stylized' — the dropdown was removed from the menu.
 const terrain = createTerrain({
   THREE, scene, renderer,
-  style: initialStyle, perfMode: 'high', seed,
+  style: 'stylized', perfMode: 'high', seed,
   biomeAt,
   scatterGeometries,
   enableVillages: false,
@@ -211,11 +212,13 @@ const hud_ = new HUD(hud, graph);
 const uiRoot = document.getElementById('ui-root');
 // Menu uses its own car instance so the world car doesn't visually teleport.
 const menuCar = buildCarModel(THREE);
-const menu = new MainMenu({ THREE, uiRoot, carModel: menuCar, initialStyle });
+const menu = new MainMenu({ THREE, uiRoot, carModel: menuCar, initialTraffic });
 menu.show();
-menu.onStyleChange = (styleName) => {
-  terrain.setStyle(styleName);
-  localStorage.setItem(LS_STYLE, styleName);
+// Apply the persisted traffic density to the engine before the game starts.
+traffic.setDensity(initialTraffic);
+menu.onTrafficChange = (density) => {
+  traffic.setDensity(density);
+  localStorage.setItem(LS_TRAFFIC, density);
 };
 
 const fsm = new StateMachine();
