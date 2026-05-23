@@ -328,6 +328,7 @@ function tick(now) {
 
   chase.update(visual);
   terrain.update(camera.position, frameDt);
+  terrain.updateAtmosphere(physics.x, physics.z);
   if (!gameOver) {
     traffic.update(frameDt, physics);
     traffic.resolveCollisions(physics);
