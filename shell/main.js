@@ -11,7 +11,7 @@ import { buildRoadCenterLine } from '../lib/roads/center-line.js';
 import { buildGuardrails } from '../lib/roads/guardrails.js';
 import { AITraffic } from '../lib/traffic/ai-traffic.js';
 import { riverDepthAt } from '../lib/terrain/carve.js';
-import { buildCarModel } from '../lib/car/model.js';
+import { buildCoupeModel } from '../lib/car/models/coupe.js';
 import { CarPhysics, CAR_CONSTANTS } from '../lib/car/physics.js';
 import { Input } from '../lib/car/input.js';
 import { ChaseCamera } from '../lib/car/camera.js';
@@ -118,8 +118,9 @@ if (!scene.children.some(c => c.isDirectionalLight)) {
   scene.add(new THREE.HemisphereLight(0xcfd8e0, 0x202428, 0.5));
 }
 
-// Car + physics + input + chase camera.
-const car = buildCarModel(THREE);
+// Car + physics + input + chase camera. Player drives a Mazda FC RX-7
+// (2nd gen, 1985-91). Traffic uses the rest of the car registry.
+const car = buildCoupeModel(THREE);
 // Default Euler order is 'XYZ' which applies X (pitch) and Z (roll) BEFORE
 // Y (yaw). With our yaw = heading + PI flip, pitch ends up acting around
 // the model's local +X axis after a 180° yaw, which points to world -X —
@@ -211,7 +212,7 @@ const hud_ = new HUD(hud, graph);
 
 const uiRoot = document.getElementById('ui-root');
 // Menu uses its own car instance so the world car doesn't visually teleport.
-const menuCar = buildCarModel(THREE);
+const menuCar = buildCoupeModel(THREE);
 const menu = new MainMenu({ THREE, uiRoot, carModel: menuCar, initialTraffic });
 menu.show();
 // Apply the persisted traffic density to the engine before the game starts.

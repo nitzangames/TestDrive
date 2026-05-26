@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Just Drive — car models</title>
+  <style>
+    html, body { margin:0; padding:0; background:#0a0e14; color:#cfd8e0;
+      font-family:ui-monospace,Menlo,monospace; height:100%; overflow:hidden; }
+    h1 { text-align:center; margin:18px 0 4px; font-size:22px; letter-spacing:0.08em; font-weight:600; }
+    p  { text-align:center; margin:0 0 18px; font-size:13px; opacity:0.65; }
+    .row { display:grid; grid-template-columns:repeat(4, 1fr); grid-template-rows:repeat(3, 1fr); gap:12px; padding:0 16px 16px; height:calc(100% - 80px); }
+    .cell { background:#13181f; border-radius:10px; display:flex; flex-direction:column; align-items:stretch; overflow:hidden; }
+    .canvas-wrap { flex:1; min-height:0; position:relative; }
+    canvas { display:block; width:100%; height:100%; }
+    .label { padding:10px 0; text-align:center; font-size:16px; letter-spacing:0.06em; font-weight:600; }
+    .sub   { padding:0 0 12px; text-align:center; font-size:11px; opacity:0.55; }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+  <h1>JUST DRIVE — CAR MODELS</h1>
+  <p>Pick one. Each cell is a live 3D turntable.</p>
+  <div class="row" id="row"></div>
+
+  <script type="module">
+    import { CAR_BUILDERS } from '../lib/car/models/index.js';
+
+    const CARS = [
+      { key: 'sedan',    label: 'SEDAN',         note: 'Volvo S60 style',     color: 0x8b8d92 },
+      { key: 'compact',  label: 'COMPACT SEDAN', note: 'BMW E30 style',       color: 0xeaeae0 },
+      { key: 'coupe',    label: 'COUPE',         note: 'FC RX-7 style',       color: 0xefece4 },
+      { key: 'minivan',  label: 'MINIVAN',       note: 'Honda Odyssey style', color: 0xc8ccd0 },
+      { key: 'cargovan', label: 'CARGO VAN',     note: 'Ford Transit style',  color: 0xf2f2f0 },
+      { key: 'pickup',   label: 'PICKUP',        note: 'Dodge Ram style',     color: 0xd6d6d4 },
+      { key: 'sports',   label: 'SPORTS COMPACT',note: 'FD RX-7 style',       color: 0xc83232 },
+      { key: 'supercar', label: 'SUPERCAR',      note: 'Acura NSX style',     color: 0xd4a428 },
+      { key: 'suv',      label: 'SUV',           note: 'Rivian R1S style',    color: 0xeeeeec },
+      { key: 'truck',    label: 'CARGO TRUCK',   note: 'cabover box truck',   color: 0xeeeeec },
+      { key: 'keitruck', label: 'KEI TRUCK',     note: 'Suzuki Carry style',  color: 0xeeeeec },
+      { key: 'flatbed',  label: 'BOX TRUCK',     note: 'medium euro cabover', color: 0xeeeeec },
+    ];
+
+    const row = document.getElementById('row');
+    const sceneCtx = [];
+
+    for (const car of CARS) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.innerHTML = `
+        <div class="canvas-wrap"><canvas></canvas></div>
+        <div class="label">${car.label}</div>
+        <div class="sub">${car.note}</div>
+      `;
+      row.appendChild(cell);
+
+      const canvas = cell.querySelector('canvas');
+      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+      renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
+
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x13181f);
+      scene.add(new THREE.HemisphereLight(0xcfd8e0, 0x202428, 0.9));
+      const sun = new THREE.DirectionalLight(0xffffff, 1.1);
+      sun.position.set(8, 10, 8);
+      scene.add(sun);
+
+      const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 200);
+      // 1.5× zoom: camera distance divided by 1.5 → 12 → 8 along each
+      // axis. Cars take up 1.5× more of each cell.
+      camera.position.set(8, 3, 8);
+      camera.lookAt(0, 0.6, 0);
+
+      // Ground disc for visual context.
+      const ground = new THREE.Mesh(
+        new THREE.CircleGeometry(8, 32),
+        new THREE.MeshLambertMaterial({ color: 0x1d2128 }),
+      );
+      ground.rotation.x = -Math.PI / 2;
+      scene.add(ground);
+
+      const model = CAR_BUILDERS[car.key](THREE, { bodyColor: car.color });
+      scene.add(model);
+
+      sceneCtx.push({ canvas, renderer, scene, camera, model });
+    }
+
+    function fit() {
+      for (const ctx of sceneCtx) {
+        const w = ctx.canvas.clientWidth, h = ctx.canvas.clientHeight;
+        if (w && h) {
+          ctx.renderer.setSize(w, h, false);
+          ctx.camera.aspect = w / h;
+          ctx.camera.updateProjectionMatrix();
+        }
+      }
+    }
+    window.addEventListener('resize', fit);
+    fit();
+
+    let last = performance.now();
+    function tick(now) {
+      const dt = Math.min(0.1, (now - last) / 1000);
+      last = now;
+      for (const ctx of sceneCtx) {
+        ctx.model.rotation.y += dt * 0.5;
+        ctx.renderer.render(ctx.scene, ctx.camera);
+      }
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  </script>
+</body>
+</html>

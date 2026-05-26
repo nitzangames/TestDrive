@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>thumbnail</title>
+  <style>
+    html, body { margin:0; padding:0; width:512px; height:512px; overflow:hidden; }
+    .wrap { width:512px; height:512px; position:relative; }
+    canvas { display:block; width:100%; height:100%; }
+    .title-overlay { position:absolute; left:0; right:0; bottom:6%;
+      text-align:center; pointer-events:none;
+      font-family:'Helvetica Neue', Arial, sans-serif;
+      font-weight:900; letter-spacing:0.04em;
+      color:#fff; text-shadow:0 4px 14px rgba(0,0,0,0.55);
+      font-size:56px; line-height:1; }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+  <div class="wrap">
+    <canvas id="c"></canvas>
+    <div class="title-overlay">JUST DRIVE</div>
+  </div>
+  <script type="module">
+    import { buildCoupeModel } from '../lib/car/models/coupe.js';
+
+    function makeSky(THREE, top, bottom) {
+      const skyGeom = new THREE.BoxGeometry(800, 800, 800);
+      const colors = new Float32Array(skyGeom.attributes.position.count * 3);
+      const topC = new THREE.Color(top), botC = new THREE.Color(bottom);
+      const posArr = skyGeom.attributes.position.array;
+      for (let i = 0; i < skyGeom.attributes.position.count; i++) {
+        const y = posArr[i * 3 + 1];
+        const t = (y / 400 + 1) / 2;
+        const c = botC.clone().lerp(topC, t);
+        colors[i * 3] = c.r; colors[i * 3 + 1] = c.g; colors[i * 3 + 2] = c.b;
+      }
+      skyGeom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      return new THREE.Mesh(
+        skyGeom,
+        new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide }),
+      );
+    }
+
+    const canvas = document.getElementById('c');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setPixelRatio(2);
+    renderer.setSize(512, 512, false);
+
+    const scene = new THREE.Scene();
+    scene.add(makeSky(THREE, 0xf4974a, 0xffd47a));     // warm sunset
+    scene.add(new THREE.HemisphereLight(0xeef4ff, 0x404848, 0.9));
+    const sun = new THREE.DirectionalLight(0xfff2d8, 1.1);
+    sun.position.set(10, 14, 6);
+    scene.add(sun);
+
+    const car = buildCoupeModel(THREE, { bodyColor: 0xc83232 });   // red FC
+    car.rotation.y = 0.55;
+    scene.add(car);
+
+    const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 2000);
+    camera.position.set(-3.5, 1.4, -5.5);
+    camera.lookAt(0, 0.6, 0);
+
+    // Render a few frames so the canvas is fully drawn, then signal ready.
+    let frames = 0;
+    function tick() {
+      renderer.render(scene, camera);
+      frames++;
+      if (frames < 5) requestAnimationFrame(tick);
+      else window.__rendered = true;
+    }
+    requestAnimationFrame(tick);
+  </script>
+</body>
+</html>

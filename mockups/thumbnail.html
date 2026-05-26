@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Just Drive — thumbnail mockups</title>
+  <style>
+    html, body { margin:0; padding:0; background:#0a0e14; color:#cfd8e0;
+      font-family:ui-monospace,Menlo,monospace; height:100%; overflow:hidden; }
+    h1 { text-align:center; margin:18px 0 4px; font-size:22px; letter-spacing:0.08em; font-weight:600; }
+    p  { text-align:center; margin:0 0 18px; font-size:13px; opacity:0.65; }
+    .row { display:grid; grid-template-columns:repeat(2, 1fr); grid-template-rows:repeat(2, 1fr);
+      gap:24px; padding:0 24px 24px; height:calc(100% - 80px); }
+    .cell { background:#13181f; border-radius:10px; display:flex; flex-direction:column;
+      align-items:stretch; overflow:hidden; }
+    .canvas-wrap { flex:1; min-height:0; position:relative; aspect-ratio: 1 / 1;
+      align-self: center; max-height: 100%; container-type: size; }
+    canvas { display:block; width:100%; height:100%; }
+    .label { padding:10px 0; text-align:center; font-size:14px; letter-spacing:0.06em; font-weight:600; }
+    .sub   { padding:0 0 12px; text-align:center; font-size:11px; opacity:0.55; }
+
+    .title-overlay { position:absolute; left:0; right:0;
+      text-align:center; pointer-events:none;
+      font-family:'Helvetica Neue', Arial, sans-serif;
+      font-weight:900; letter-spacing:0.04em;
+      color:#fff; text-shadow:0 4px 14px rgba(0,0,0,0.55);
+      font-size:11cqw; line-height:1; }
+    .title-top    { top: 6%; }
+    .title-bottom { bottom: 6%; }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+  <h1>JUST DRIVE — THUMBNAIL MOCKUPS</h1>
+  <p>Just the car + the logo. Clean backgrounds, 1:1 framing.</p>
+  <div class="row" id="row"></div>
+
+  <script type="module">
+    import { buildCoupeModel } from '../lib/car/models/coupe.js';
+
+    // Simple gradient sky box.
+    function makeSky(THREE, top, bottom) {
+      const skyGeom = new THREE.BoxGeometry(800, 800, 800);
+      const colors = new Float32Array(skyGeom.attributes.position.count * 3);
+      const topC = new THREE.Color(top), botC = new THREE.Color(bottom);
+      const posArr = skyGeom.attributes.position.array;
+      for (let i = 0; i < skyGeom.attributes.position.count; i++) {
+        const y = posArr[i * 3 + 1];
+        const t = (y / 400 + 1) / 2;
+        const c = botC.clone().lerp(topC, t);
+        colors[i * 3] = c.r; colors[i * 3 + 1] = c.g; colors[i * 3 + 2] = c.b;
+      }
+      skyGeom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      return new THREE.Mesh(
+        skyGeom,
+        new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide }),
+      );
+    }
+
+    function setupLights(scene) {
+      scene.add(new THREE.HemisphereLight(0xeef4ff, 0x404848, 0.9));
+      const sun = new THREE.DirectionalLight(0xfff2d8, 1.1);
+      sun.position.set(10, 14, 6);
+      scene.add(sun);
+    }
+
+    // Each mockup: build(scene, camera) → places the car and frames it.
+    // No road, no terrain — empty space, sky behind.
+    const MOCKUPS = [
+      {
+        label: 'REAR 3/4',
+        title: 'JUST DRIVE',
+        titlePos: 'top',
+        skyTop: 0x6ab4f4, skyBottom: 0xdde9f5,
+        build(scene, camera) {
+          const car = buildCoupeModel(THREE, { bodyColor: 0xefece4 });
+          car.rotation.y = Math.PI - 0.35;     // ~20° turned toward camera
+          scene.add(car);
+          camera.position.set(3.2, 1.5, 5.5);
+          camera.lookAt(0, 0.65, 0);
+        },
+      },
+      {
+        label: 'SIDE PROFILE',
+        title: 'JUST DRIVE',
+        titlePos: 'bottom',
+        skyTop: 0x2a3a4a, skyBottom: 0x5a6a78,
+        build(scene, camera) {
+          const car = buildCoupeModel(THREE, { bodyColor: 0xefece4 });
+          car.rotation.y = -Math.PI / 2;       // facing +X
+          scene.add(car);
+          camera.position.set(0, 0.95, 6.4);
+          camera.lookAt(0, 0.7, 0);
+        },
+      },
+      {
+        label: 'FRONT 3/4',
+        title: 'JUST DRIVE',
+        titlePos: 'bottom',
+        skyTop: 0xf4974a, skyBottom: 0xffd47a,
+        build(scene, camera) {
+          const car = buildCoupeModel(THREE, { bodyColor: 0xc83232 });
+          car.rotation.y = 0.55;               // turned ~30° toward camera-right
+          scene.add(car);
+          camera.position.set(-3.5, 1.4, -5.5);
+          camera.lookAt(0, 0.6, 0);
+        },
+      },
+      {
+        label: 'TOP-DOWN HERO',
+        title: 'JUST DRIVE',
+        titlePos: 'bottom',
+        skyTop: 0x14181f, skyBottom: 0x202832,
+        build(scene, camera) {
+          const car = buildCoupeModel(THREE, { bodyColor: 0xefece4 });
+          car.rotation.y = Math.PI;
+          scene.add(car);
+          camera.position.set(0, 5.5, 3.5);
+          camera.lookAt(0, 0.4, -0.2);
+        },
+      },
+    ];
+
+    const row = document.getElementById('row');
+    const ctxs = [];
+    for (const m of MOCKUPS) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      const titleClass = `title-overlay title-${m.titlePos}`;
+      cell.innerHTML = `
+        <div class="canvas-wrap">
+          <canvas></canvas>
+          <div class="${titleClass}">${m.title}</div>
+        </div>
+        <div class="label">${m.label}</div>
+        <div class="sub">FC RX-7 + logo, no road / no terrain</div>
+      `;
+      row.appendChild(cell);
+      const canvas = cell.querySelector('canvas');
+      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+      renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
+
+      const scene = new THREE.Scene();
+      scene.add(makeSky(THREE, m.skyTop, m.skyBottom));
+      setupLights(scene);
+
+      const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 200);
+      m.build(scene, camera);
+      ctxs.push({ canvas, renderer, scene, camera });
+    }
+
+    function fit() {
+      for (const c of ctxs) {
+        const w = c.canvas.clientWidth, h = c.canvas.clientHeight;
+        if (w && h) {
+          c.renderer.setSize(w, h, false);
+          c.camera.aspect = w / h;
+          c.camera.updateProjectionMatrix();
+        }
+      }
+    }
+    window.addEventListener('resize', fit);
+    fit();
+
+    function tick() {
+      for (const c of ctxs) c.renderer.render(c.scene, c.camera);
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  </script>
+</body>
+</html>
