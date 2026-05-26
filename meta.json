@@ -1,7 +1,7 @@
 {
   "slug": "test-drive",
-  "title": "TestDrive",
-  "description": "Open-road driving sandbox. Cruise a procedural road network across mountains, rivers, and forests on a 64 km world.",
+  "title": "Just Drive",
+  "description": "Cruise a 64 km procedural world in an FC RX-7. Mountains, rivers, forests, biomes, and AI traffic — no objectives, just drive.",
   "tags": ["3d", "driving", "sandbox", "open-world", "casual"],
   "author": "nitzanwilnai",
   "thumbnail": "thumbnail.png"
