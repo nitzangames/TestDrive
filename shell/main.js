@@ -384,6 +384,7 @@ function tick(now) {
   }
   hud_.setCar(physics);
   hud_.setSpeed(physics.speed);
+  hud_.setSteering(input._steering ?? 0);
   hud_.draw(frameDt);
 
   renderer.render(scene, camera);

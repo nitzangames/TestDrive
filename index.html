@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-  <meta name="game-version" content="v0.10.29">
+  <meta name="game-version" content="v0.10.32">
   <title>Just Drive</title>
   <link rel="icon" href="data:,">
   <style>
@@ -14,10 +14,11 @@
     }
     #stage {
       position: relative;
-      aspect-ratio: 9 / 16;
-      max-width: 100vw;
-      max-height: 100vh;
-      height: 100vh;
+      /* 9:16 letterbox, per platform spec (game-dev-notes.md). dvh
+         instead of vh so the box reflows when mobile browser chrome
+         shows/hides. */
+      width:  min(100vw, calc(100dvh * 9 / 16));
+      height: min(100dvh, calc(100vw  * 16 / 9));
       container-type: size;
     }
     canvas {
